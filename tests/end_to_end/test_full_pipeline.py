@@ -42,3 +42,4 @@ async def test_full_investigation_pipeline():
     assert len(reasons) == 5
 
     switcher.switch_to_main()
+

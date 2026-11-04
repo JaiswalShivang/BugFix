@@ -1,77 +1,21 @@
 import os
 from typing import Dict, Any
 from .command_runner import run_constrained_command
-
-PATCHED_ROUTE_CONTENT = """import { findCouponByCode } from "@/lib/coupons";
-
-export async function POST(req: Request) {
-  const { code } = await req.json();
-  if (!code || typeof code !== "string" || !code.trim()) {
-    return Response.json({ ok: false, message: "Please enter a coupon code" }, { status: 400 });
-  }
-  const coupon = await findCouponByCode(code.trim().toUpperCase());
-  if (!coupon || coupon.expired) {
-    return Response.json({ ok: false, message: "Coupon expired" }, { status: 400 });
-  }
-  return Response.json({ ok: true, discount: coupon.discount, message: "Coupon applied" }, { status: 200 });
-}
-"""
-
-PATCHED_TEST_CONTENT = """import test from "node:test";
-import assert from "node:assert/strict";
-import { findCouponByCode } from "../lib/coupons";
-
-test("findCouponByCode returns coupon for valid SAVE20", async () => {
-  const coupon = await findCouponByCode("SAVE20");
-  assert.ok(coupon);
-  assert.equal(coupon.discount, 20);
-  assert.equal(coupon.expired, false);
-});
-
-test("findCouponByCode returns null for EXPIRED10", async () => {
-  const coupon = await findCouponByCode("EXPIRED10");
-  assert.equal(coupon, null);
-});
-
-test("findCouponByCode returns null for empty or invalid code", async () => {
-  assert.equal(await findCouponByCode(""), null);
-  assert.equal(await findCouponByCode("NONEXISTENT"), null);
-});
-"""
+from .agent_runner import AgentCoder
 
 def apply_patch_and_verify(
     worktree_path: str,
     investigation_id: str,
     artifacts_root: str = "artifacts",
 ) -> Dict[str, Any]:
-    route_file = os.path.join(
-        worktree_path,
-        "apps",
-        "demo-ecommerce",
-        "app",
-        "api",
-        "checkout",
-        "coupon",
-        "route.ts",
+    coder = AgentCoder(worktree_path)
+    prompt = (
+        f"Fix unhandled null dereference in apps/demo-ecommerce/app/api/checkout/coupon/route.ts "
+        f"for investigation {investigation_id}. Return HTTP 400 with message 'Coupon expired' when coupon is missing "
+        f"or expired. Return HTTP 400 'Please enter a coupon code' for empty input. Add regression test assertions "
+        f"in apps/demo-ecommerce/tests/coupon.test.ts covering EXPIRED10, SAVE20, and empty code."
     )
-    test_file = os.path.join(
-        worktree_path,
-        "apps",
-        "demo-ecommerce",
-        "tests",
-        "coupon.test.ts",
-    )
-
-    if not os.path.exists(os.path.dirname(route_file)):
-        os.makedirs(os.path.dirname(route_file), exist_ok=True)
-    if not os.path.exists(os.path.dirname(test_file)):
-        os.makedirs(os.path.dirname(test_file), exist_ok=True)
-
-    with open(route_file, "w", encoding="utf-8") as f:
-        f.write(PATCHED_ROUTE_CONTENT)
-
-    with open(test_file, "w", encoding="utf-8") as f:
-        f.write(PATCHED_TEST_CONTENT)
+    agent_exec = coder.generate_patch(prompt, investigation_id)
 
     test_res = run_constrained_command(
         ["pnpm", "--filter", "demo-ecommerce", "test"],
@@ -102,6 +46,9 @@ def apply_patch_and_verify(
 - Status: `{status}`
 - Worktree: `{worktree_path}`
 - Branch: `bugproof/{investigation_id}`
+- Agent Engine: `{agent_exec['engine']}`
+- Agent Invocation: `{agent_exec['invocation']}`
+- Agent Output: `{agent_exec['output']}`
 - Files changed:
   - `apps/demo-ecommerce/app/api/checkout/coupon/route.ts`
   - `apps/demo-ecommerce/tests/coupon.test.ts`
@@ -122,6 +69,9 @@ Added guard `!coupon || coupon.expired` returning HTTP 400 with `{{ ok: false, m
         "investigation_id": investigation_id,
         "worktree_path": worktree_path,
         "branch_name": f"bugproof/{investigation_id}",
+        "agent_engine": agent_exec["engine"],
+        "agent_invocation": agent_exec["invocation"],
+        "agent_output": agent_exec["output"],
         "files_changed": [
             "apps/demo-ecommerce/app/api/checkout/coupon/route.ts",
             "apps/demo-ecommerce/tests/coupon.test.ts",

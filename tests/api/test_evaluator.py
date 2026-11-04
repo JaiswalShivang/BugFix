@@ -57,3 +57,4 @@ def test_evaluator_regression_failed():
     }
     status, reasons = evaluate_verification(base, patch, retest)
     assert status == InvestigationStatus.NOT_VERIFIED
+

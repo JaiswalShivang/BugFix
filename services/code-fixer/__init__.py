@@ -10,3 +10,4 @@ __all__ = [
     "apply_patch_and_verify",
     "CodeFixerAdapter",
 ]
+

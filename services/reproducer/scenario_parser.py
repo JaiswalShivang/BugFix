@@ -39,3 +39,4 @@ def parse_spoken_scenario(text: str, default_target: str = "http://localhost:300
         "raw_text": text,
         "summary": f"Target: {target_url} · Coupon: {coupon}",
     }
+

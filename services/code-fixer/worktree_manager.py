@@ -75,3 +75,4 @@ class WorktreeManager:
             capture_output=True,
             shell=False,
         )
+

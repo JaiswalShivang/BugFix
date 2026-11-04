@@ -1,0 +1,12 @@
+FROM mcr.microsoft.com/playwright/python:v1.44.0-jammy
+WORKDIR /app
+RUN apt-get update && apt-get remove -y git && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY services/reproducer ./services/reproducer
+COPY packages ./packages
+COPY configs ./configs
+RUN mkdir -p artifacts
+HEALTHCHECK --interval=3s --timeout=3s --start-period=5s --retries=10 \
+  CMD python -c "import sys; sys.exit(0)"
+CMD ["python", "-m", "services.reproducer.worker"]

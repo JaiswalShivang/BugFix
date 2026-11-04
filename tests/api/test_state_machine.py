@@ -20,3 +20,4 @@ def test_database_transitions():
     finally:
         if os.path.exists(temp_db):
             os.remove(temp_db)
+

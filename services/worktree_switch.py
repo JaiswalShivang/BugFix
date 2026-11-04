@@ -46,3 +46,4 @@ class WorktreeSwitcher:
             shutil.copyfile(self.main_backup_path, self.main_route_path)
             return True
         return False
+

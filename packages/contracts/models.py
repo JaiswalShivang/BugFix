@@ -108,3 +108,4 @@ class InvestigationState(BaseModel):
     verification_report: Optional[VerificationReport] = None
     decision: Optional[Decision] = None
     history: List[Dict[str, Any]] = Field(default_factory=list)
+

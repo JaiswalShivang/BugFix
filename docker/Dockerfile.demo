@@ -1,0 +1,11 @@
+FROM node:20-alpine
+WORKDIR /app
+RUN npm install -g pnpm
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
+COPY apps/demo-ecommerce/package.json ./apps/demo-ecommerce/
+RUN pnpm install --filter demo-ecommerce...
+COPY apps/demo-ecommerce ./apps/demo-ecommerce
+EXPOSE 3000
+HEALTHCHECK --interval=3s --timeout=3s --start-period=10s --retries=10 \
+  CMD wget --spider http://127.0.0.1:3000/checkout || exit 1
+CMD ["pnpm", "--filter", "demo-ecommerce", "dev", "-p", "3000"]

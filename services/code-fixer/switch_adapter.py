@@ -82,3 +82,4 @@ if __name__ == "__main__":
     inv_id = sys.argv[2] if len(sys.argv) > 2 else "BP-0007"
     res = adapter.handle_message(msg, inv_id)
     print(json.dumps(res, indent=2))
+

@@ -14,3 +14,4 @@ Code fixing is isolated in dedicated Git worktrees under `worktrees/` to leave `
 
 ## Decision 5: Console Error Filtering
 HTTP 400 responses from invalid coupon validations log standard resource response notices in Chromium. The reproducer filters expected 400 resource status logs while treating unhandled exceptions, TypeErrors, and 5xx errors as failures.
+

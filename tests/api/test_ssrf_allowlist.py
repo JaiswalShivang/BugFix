@@ -11,3 +11,4 @@ def test_blocked_urls():
     assert not is_target_url_allowed("http://evil-attacker.com/payload")
     assert not is_target_url_allowed("ftp://demo-app:3000/checkout")
     assert not is_target_url_allowed("http://10.0.0.1/admin")
+

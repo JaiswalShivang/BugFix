@@ -34,3 +34,4 @@ def is_target_url_allowed(url: str) -> bool:
         return False
     except Exception:
         return False
+

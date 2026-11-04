@@ -62,3 +62,4 @@ To restore the repository and demo store to pristine unpatched state in under 15
 ```bash
 make demo-reset
 ```
+

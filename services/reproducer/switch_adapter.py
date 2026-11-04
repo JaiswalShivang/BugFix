@@ -38,8 +38,8 @@ class BugReproducerAdapter:
                 "report": result,
                 "message": (
                     f"@{self.name} completed independent retest for {investigation_id}. "
-                    f"Result: {result['status']}. Passed {result['passes_observed']}/3 attempts. "
-                    f"Regressions: 0 detected. Tagging qa-commander for sign-off."
+                    f"Observed {result['passes_observed']}/3 passes. "
+                    f"Regressions: 0 detected. Transmitting report to evaluator for deterministic verdict."
                 ),
             }
         else:
@@ -64,3 +64,4 @@ if __name__ == "__main__":
     inv_id = sys.argv[2] if len(sys.argv) > 2 else "BP-0007"
     res = asyncio.run(adapter.handle_message(msg, inv_id))
     print(json.dumps(res, indent=2))
+
