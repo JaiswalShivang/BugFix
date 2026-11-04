@@ -1,0 +1,60 @@
+version: "1.0"
+room:
+  name: "bugproof"
+  description: "Evidence-based AI debugging and independent verification room (Proof Before Fix)"
+  instructions: |
+    MISSION: Investigate reported web application bugs using strict evidence-first handoffs.
+
+    1. ROLE BOUNDARIES:
+      - @bug-reproducer (@repro): You operate ONLY in the isolated Playwright browser container. You may navigate approved target URLs (http://demo-app:3000), execute 3x reproduction runs, capture screenshots/traces/logs, and publish structured reproduction reports as Room Documents. You have ZERO access to source code and must never guess code fixes.
+      - @code-fixer (@fixer): You operate ONLY inside an isolated Git worktree (/worktrees/{investigation_id}). You must NOT edit code until @bug-reproducer posts a confirmed REPRODUCED report in this room. You must write a minimal fix, add a regression test, run allowlisted checks (test/typecheck), post the Git diff, and tag @bug-reproducer for an independent retest. You may NEVER merge to main, deploy, or declare your own patch VERIFIED.
+      - Human (Role: qa-commander): Holds exclusive authority to approve patch repair and sign off on final VERIFIED status.
+
+    2. PROOF BEFORE FIX PROTOCOL:
+      - Stage 1: @repro runs 3 baseline attempts -> posts reproduction-report-{id}.json.
+      - Stage 2: Human qa-commander authorizes @fixer -> @fixer patches isolated worktree + runs tests -> posts patch-summary-{id}.md.
+      - Stage 3: @repro independently reruns the exact 3 browser attempts against the reloaded worktree -> posts verification-report-{id}.json.
+      - Stage 4: Final status is VERIFIED only if baseline failed 3/3, unit/regression tests exited 0, and independent retest passed 3/3.
+
+    3. STOP CONDITIONS:
+      - Halt immediately and report INCONCLUSIVE or ENVIRONMENT_UNAVAILABLE if the target URL is not on the local allowlist, if baseline reproduction fails fewer than 3/3 times, or if required tests fail.
+
+roles:
+  - name: "qa-commander"
+    description: "Human lead who authorizes worktree patches and approves final verified diffs"
+    assigned_to: ["human"]
+    approval_gate: true
+  - name: "reproducer"
+    description: "Black-box Playwright browser reproduction and independent retest worker"
+    assigned_to: ["bug-reproducer"]
+  - name: "fixer"
+    description: "White-box isolated Git worktree coding and regression test worker"
+    assigned_to: ["code-fixer"]
+
+agents:
+  - name: "bug-reproducer"
+    runtime: "playwright-worker"
+    adapter: "services/reproducer"
+    status_check: "services.reproducer.switch_adapter.BugReproducerAdapter"
+  - name: "code-fixer"
+    runtime: "worktree-worker"
+    adapter: "services/code-fixer"
+    status_check: "services.code-fixer.switch_adapter.CodeFixerAdapter"
+
+aliases:
+  - alias: "repro"
+    target: "bug-reproducer"
+  - alias: "fixer"
+    target: "code-fixer"
+
+references:
+  - name: "demo-app-url"
+    value: "http://demo-app:3000"
+  - name: "worktree-root"
+    value: "/worktrees"
+  - name: "rubric"
+    value: "configs/switch/verification-policy.md"
+
+documents:
+  - name: "verification-policy.md"
+    path: "configs/switch/verification-policy.md"
