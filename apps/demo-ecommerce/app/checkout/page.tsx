@@ -8,7 +8,6 @@ export default function CheckoutPage() {
   const [discountPercent, setDiscountPercent] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
-  const [isServerError, setIsServerError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const subtotal = 120.0;
@@ -19,7 +18,6 @@ export default function CheckoutPage() {
     e.preventDefault();
     setMessage(null);
     setIsError(false);
-    setIsServerError(false);
 
     if (!couponCode || !couponCode.trim()) {
       setIsError(true);
@@ -36,7 +34,6 @@ export default function CheckoutPage() {
       });
 
       if (res.status >= 500) {
-        setIsServerError(true);
         setIsError(true);
         setMessage("Internal Server Error");
         console.error("HTTP 500: Failed to apply coupon " + couponCode);
@@ -53,7 +50,6 @@ export default function CheckoutPage() {
         setMessage(data.message || "Coupon applied");
       }
     } catch (err) {
-      setIsServerError(true);
       setIsError(true);
       setMessage("Internal Server Error");
       console.error(err);
@@ -162,11 +158,6 @@ export default function CheckoutPage() {
                 }}
               >
                 {message}
-              </div>
-            )}
-            {isServerError && (
-              <div style={{ marginTop: 8, fontSize: 12, color: "#c8402a", fontWeight: 600 }}>
-                Internal Server Error
               </div>
             )}
           </form>
