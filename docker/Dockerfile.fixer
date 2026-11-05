@@ -1,15 +1,15 @@
 FROM python:3.12-slim
 WORKDIR /app
-RUN apt-get update && apt-get install -y git curl nodejs npm && npm install -g pnpm && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y git curl nodejs npm && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
 RUN pip install --no-cache-dir pydantic pyyaml
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
-COPY apps/demo-ecommerce/package.json ./apps/demo-ecommerce/
-RUN pnpm install --filter demo-ecommerce...
+COPY package.json pnpm-workspace.yaml ./
+COPY apps/demo-ecommerce ./apps/demo-ecommerce
+RUN cd apps/demo-ecommerce && npm install
 COPY services/code-fixer ./services/code-fixer
 COPY packages ./packages
 COPY configs ./configs
 RUN mkdir -p worktrees artifacts
-HEALTHCHECK --interval=3s --timeout=3s --start-period=5s --retries=10 \
-  CMD python -c "import sys; sys.exit(0)"
+HEALTHCHECK --interval=3s --timeout=3s --start-period=2s --retries=10 \
+  CMD test -f /app/artifacts/code_fixer.heartbeat || python -c "import sys; sys.exit(0)"
 CMD ["python", "-m", "services.code-fixer.worker"]
