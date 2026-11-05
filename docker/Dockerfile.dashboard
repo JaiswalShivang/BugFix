@@ -1,12 +1,12 @@
 FROM node:20-slim
 WORKDIR /app
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y curl libatomic1 && rm -rf /var/lib/apt/lists/*
 RUN npm install -g pnpm
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY apps/dashboard/package.json ./apps/dashboard/
 RUN pnpm install --filter dashboard...
 COPY apps/dashboard ./apps/dashboard
 EXPOSE 3000
-HEALTHCHECK --interval=3s --timeout=3s --start-period=5s --retries=10 \
+HEALTHCHECK --interval=3s --timeout=3s --start-period=5s --retries=15 \
   CMD curl -f http://127.0.0.1:3000 || exit 1
 CMD ["pnpm", "--filter", "dashboard", "dev", "-p", "3000"]
