@@ -46,3 +46,10 @@ def test_live_container_isolation():
         text=True,
     )
     assert browser_check.returncode != 0
+
+    playwright_check = subprocess.run(
+        ["docker", "exec", "bugproof-code-fixer", "python", "-c", "import playwright"],
+        capture_output=True,
+        text=True,
+    )
+    assert playwright_check.returncode != 0
