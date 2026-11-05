@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 from typing import Dict, Any, Optional
 
@@ -69,6 +70,13 @@ class WorktreeManager:
             capture_output=True,
             shell=False,
         )
+        subprocess.run(
+            ["git", "worktree", "prune"],
+            cwd=self.repo_root,
+            capture_output=True,
+            shell=False,
+        )
+        shutil.rmtree(worktree_path, ignore_errors=True)
         subprocess.run(
             ["git", "branch", "-D", f"bugproof/{inv_id}"],
             cwd=self.repo_root,
