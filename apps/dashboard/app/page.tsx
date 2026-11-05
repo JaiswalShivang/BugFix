@@ -162,9 +162,21 @@ export default function CaseFilePage() {
     },
   ];
 
-  const parsedPreview = voiceInput
-    ? `Target: demo-app:3000/checkout · Coupon: ${voiceInput.toLowerCase().includes("save") ? "SAVE20" : "EXPIRED10"}`
-    : "Listening for spoken or typed input (/ to focus)";
+  let parsedPreview = "Listening via Wispr Flow... (Press / to focus · Dictate @repro, @fixer, or approve)";
+  if (voiceInput) {
+    const vl = voiceInput.toLowerCase();
+    if (vl.startsWith("!")) {
+      parsedPreview = `Switch Room Command: ${voiceInput.trim()} -> Execute inspection`;
+    } else if (vl.includes("@repro") || vl.includes("reproduce") || vl.includes("investigate") || vl.includes("start investigation")) {
+      parsedPreview = "Checkpoint 1 (@repro): Baseline 3/3 Playwright reproduction -> demo-app:3000/checkout";
+    } else if (vl.includes("@fixer") || vl.includes("patch") || vl.includes("worktree") || vl.includes("fix")) {
+      parsedPreview = "Checkpoint 2 (@fixer): Isolated Git worktree patch (Groq LLM) + independent 3/3 browser retest";
+    } else if (vl.includes("qa-commander") || vl.includes("approve") || vl.includes("accept") || vl.includes("sign")) {
+      parsedPreview = "Checkpoint 3 (qa-commander): Human Gate Sign-off -> Record verified decision in #bugproof";
+    } else {
+      parsedPreview = `Room message: "${voiceInput}" -> Route to #bugproof`;
+    }
+  }
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
@@ -498,6 +510,78 @@ export default function CaseFilePage() {
               <li>Independent post-patch browser retest passed 3/3 times with zero console errors.</li>
               <li>Auxiliary checkout flows (SAVE20 20% discount and empty promo) preserved.</li>
             </ol>
+          </section>
+
+          <section style={{ border: "1px solid var(--border-hairline)", padding: 20, background: "var(--bg-surface)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div>
+                <div className="mono" style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase" }}>
+                  Interactive 3-Checkpoint Flow // Wispr Voice Or Direct Trigger
+                </div>
+                <div style={{ fontSize: 13, marginTop: 4 }}>
+                  Execute the 3 distinct checkpoints step-by-step or dictate via Wispr Flow into the command bar below.
+                </div>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button
+                disabled={isSubmittingVoice || status === "REPRODUCING"}
+                onClick={() =>
+                  handleSendVoice(
+                    "@repro start investigation BP-0007 on demo-app checkout. When I apply coupon code EXPIRED10, the checkout page crashes instead of showing Coupon expired. Reproduce it three times and capture screenshots, console errors, and failed network requests."
+                  )
+                }
+                style={{
+                  background: isBaselineDone ? "var(--signal-verdigris)" : "#2b2621",
+                  color: "#fff",
+                  border: "none",
+                  padding: "8px 14px",
+                  fontSize: 12,
+                  cursor: isSubmittingVoice ? "not-allowed" : "pointer",
+                  fontWeight: 500,
+                }}
+              >
+                {isBaselineDone ? "1. Baseline Reproduced (3/3)" : "1. Trigger Baseline (@repro)"}
+              </button>
+              <button
+                disabled={!isBaselineDone || isRetestDone || isSubmittingVoice}
+                onClick={() =>
+                  handleSendVoice(
+                    "@fixer baseline failure is confirmed with a null TypeError on coupon lookup. Create isolated Git worktree BP-0007, add a null and expiry guard returning HTTP 400 Coupon expired, write a regression test, and do not touch the main branch."
+                  )
+                }
+                style={{
+                  background: isRetestDone ? "var(--signal-verdigris)" : "#2b2621",
+                  color: "#fff",
+                  border: "none",
+                  padding: "8px 14px",
+                  fontSize: 12,
+                  cursor: !isBaselineDone || isRetestDone || isSubmittingVoice ? "not-allowed" : "pointer",
+                  fontWeight: 500,
+                }}
+              >
+                {isRetestDone ? "2. Patch & Retest Verified (3/3)" : "2. Trigger Patch & Retest (@fixer)"}
+              </button>
+              <button
+                disabled={!isVerified || isAccepted || isSubmittingVoice}
+                onClick={() =>
+                  handleSendVoice(
+                    "As qa-commander, I accept verified patch BP-0007. Both the regression suite and independent three-of-three browser retest passed. Record the verified decision in the Switch room."
+                  )
+                }
+                style={{
+                  background: isAccepted ? "var(--signal-verdigris)" : "#2b2621",
+                  color: "#fff",
+                  border: "none",
+                  padding: "8px 14px",
+                  fontSize: 12,
+                  cursor: !isVerified || isAccepted || isSubmittingVoice ? "not-allowed" : "pointer",
+                  fontWeight: 500,
+                }}
+              >
+                {isAccepted ? "3. Decision Logged (Accepted)" : "3. Authorize & Sign-Off (qa-commander)"}
+              </button>
+            </div>
           </section>
 
           <section style={{ border: "1px solid var(--border-hairline)", padding: 20, background: "var(--bg-surface)" }}>

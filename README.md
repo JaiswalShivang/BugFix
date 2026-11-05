@@ -1,38 +1,55 @@
 # BugProof v2.0 — Evidence-Based AI Debugging & Independent Verification Platform
 
-> "When an AI coding agent says 'I fixed your bug,' how do you know it's telling the truth? With BugProof, you report a bug by voice inside a Switch Room using Wispr Flow. First, a black-box Playwright agent with zero access to our source code opens the live web app, reproduces the crash 3 out of 3 times, and posts visual and network evidence into Switch. Second, a white-box coding agent reads that evidence from the room and patches the real code inside an isolated Git worktree. Finally, the browser agent independently retests the hot-reloaded app 3 out of 3 times before I approve the diff via Switch's `!roles` gate. It's Proof Before Fix — powered by Switch and driven by voice."
+> **Track:** WeMakeDevs "Flip the Switch" Hackathon & "Code with Wispr" Track  
+> **Repository:** [https://github.com/JaiswalShivang/BugFix.git](https://github.com/JaiswalShivang/BugFix.git)  
+> **Core Thesis:** *Proof Before Fix.* When an AI coding assistant says "I fixed your bug," how do you know it is telling the truth? Single-agent assistants hallucinate plausible-looking patches that fail at runtime. BugProof enforces deterministic, multi-agent browser reproduction: no code is edited until a browser reproduces the bug 3/3 times, and no fix is declared verified until an independent browser agent reruns the scenario 3/3 times post-patch.
 
 ---
 
-## 1. System Architecture
+## 1. System Architecture: The Two-Agent Isolation Boundary
+
+Every debugging task flows strictly through the Switch Room `#bugproof`. Two mutually isolated agent containers perform the investigation without shared mounts or shared authority:
 
 ```
-HUMAN DEVELOPER (role: qa-commander)
-  speaks via Wispr Flow at 3 checkpoints (Report, Patch, Sign-off)
-        │ voice-to-text
-        ▼
-SWITCH ROOM (#bugproof) — LOAD-BEARING CORE
-  - Room Instructions (Proof-Before-Fix & Stop Conditions)
-  - Roles (!roles): qa-commander, bug-reproducer, code-fixer
-  - Shared Documents (!list-documents): reproduction-report.json, patch-summary.md, verification-policy.md
-  - Shared References (!list-references): demo-app URL, worktree path, rubric
-        │ 1. Reproduce & 4. Retest      │ 2. Evidence Handoff       │ 3. State/Diff Telemetry
-        ▼                               ▼                           ▼
-AGENT 1 @bug-reproducer (@repro)   AGENT 2 @code-fixer (@fixer)    BUGPROOF DASHBOARD & ARTIFACT API
-- Isolated Playwright container    - Isolated OpenCode container   (Next.js + FastAPI)
-- Access: http://demo-app:3000     - Access: Git worktree BP-0007  - Visualises PNGs, traces, Git diff
-- NO source repo mount             - NO browser verdict control    - Deterministic VERIFIED badge
-        │ browser HTTP/UI               │ edits files
-        ▼                               ▼
-TARGET DEMO APP  ◄──────────────  ISOLATED GIT WORKTREE (worktrees/BP-0007)
-(http://demo-app:3000)             hot-reloads into demo server; main untouched
+                      HUMAN DEVELOPER (Role: qa-commander)
+            Speaks via Wispr Flow (Checkpoint 1, 2, 3 or / Hotkey)
+                                  │
+                                  ▼
+                     SWITCH ROOM (#bugproof)
+          Room Instructions · Roles (!roles) · Documents · References
+                                  │
+               ┌──────────────────┴──────────────────┐
+               │ 1. Reproduce & Retest               │ 2. Evidence Handoff
+               ▼                                     ▼
+   AGENT 1: @bug-reproducer             AGENT 2: @code-fixer
+   (alias: @repro)                      (alias: @fixer)
+   Runtime: Playwright Container        Runtime: Worktree Worker (Groq AI)
+   Isolation: ZERO source repo access   Isolation: ZERO browser access
+   Access: http://demo-app:3000         Access: /worktrees/{investigation_id}
+               │                                     │
+               │ HTTP / DOM Interaction              │ Git Worktree Edits
+               ▼                                     ▼
+   TARGET DEMO STORE ◄─────────────────── ISOLATED GIT WORKTREE
+   (demo-ecommerce :3001)                (worktrees/BP-0007)
 ```
+
+### Why Switch Is 100% Load-Bearing: Isolation Table
+
+| Isolation Boundary | `@bug-reproducer` Container | `@code-fixer` Container |
+|---|---|---|
+| **Primary Mission** | Black-box browser reproduction & independent retest | White-box code analysis, Groq LLM patch, regression test |
+| **Filesystem Mounts** | `/artifacts` (writes reports, screenshots, traces) | `/worktrees/{id}`, `/artifacts` (writes patch diffs) |
+| **Source Code Access** | **ZERO.** No `/apps` or `/repo` mount; cannot view files | Mounted strictly to disposable worktree `/worktrees/{id}` |
+| **Git Binary Access** | **ZERO.** `which git` exits with code 1 | Allowed: constrained allowlist (`git diff`, `git status`) |
+| **Browser / Chromium** | Headless Chromium + Playwright runtime | **ZERO.** Chromium not installed; Playwright not installed |
+| **Verdict Authority** | Gathers browser pass/fail exit data only | **ZERO.** Cannot declare its own code change `VERIFIED` |
+| **Verification Gate** | Deterministic evaluator computes verdict from exit codes | Human `qa-commander` holds exclusive approval gate |
 
 ---
 
 ## 2. The 5 Mandatory Judge Verification Commands
 
-Run these live commands to verify clean-room environment configuration:
+Judges verify the clean-room environment configuration by executing the 5 Switch inspection commands:
 
 ```bash
 # 1. List registered agents in #bugproof
@@ -52,69 +69,103 @@ python -m services.switch.cli "!list-documents"
 python -m services.switch.cli "!list-references"
 ```
 
+### Expected Output Table
+
+| Command | Expected Clean-Room Output |
+|---|---|
+| `!list-agents` | `@bug-reproducer (runtime: playwright-worker)`, `@code-fixer (runtime: worktree-worker)` |
+| `!agents-status` | `@bug-reproducer (ONLINE - playwright-worker)`, `@code-fixer (ONLINE - worktree-worker)` |
+| `!list-aliases` | `@repro -> @bug-reproducer`, `@fixer -> @code-fixer` |
+| `!roles` | `qa-commander (assigned: human) [APPROVAL GATE]`, `reproducer (assigned: bug-reproducer)`, `fixer (assigned: code-fixer)` |
+| `!list-documents` | `verification-policy.md`, `reproduction-report-BP-0007.json`, `patch-summary-BP-0007.md` |
+| `!list-references` | `demo-app-url: http://demo-app:3000`, `worktree-root: /worktrees`, `rubric: configs/switch/verification-policy.md` |
+
 ---
 
 ## 3. The 3 Wispr Flow Voice Checkpoints
 
-### Checkpoint 1 (0:15) — Intake & Baseline Reproduction
-> "@repro start investigation BP-0007 on demo-app checkout. When I apply coupon code EXPIRED10, the checkout page crashes instead of showing Coupon expired. Reproduce it three times and capture screenshots, console errors, and failed network requests."
+The operator controls the full debugging lifecycle hands-free via Wispr Flow voice dictation. Pressing `/` in the dashboard focuses the voice command bar:
 
-### Checkpoint 2 (0:50) — Worktree Patch Directive
-> "@fixer baseline failure is confirmed with a null TypeError on coupon lookup. Create isolated Git worktree BP-0007, add a null and expiry guard returning HTTP 400 Coupon expired, write a regression test, and do not touch the main branch."
+1. **Checkpoint 1 — Bug Report & Baseline Reproduction (0:15–0:30):**
+   > *"@repro start investigation BP-0007 on demo-app checkout. When I apply coupon code EXPIRED10, the checkout page crashes instead of showing Coupon expired. Reproduce it three times and capture screenshots, console errors, and failed network requests."*
+   - Launches Chromium in `@bug-reproducer`; runs 3 attempts against `/checkout`; verifies 3/3 HTTP 500 TypeError crashes; pauses at `REPRODUCED`.
 
-### Checkpoint 3 (1:45) — Human Gate Sign-Off
-> "As qa-commander, I accept verified patch BP-0007. Both the regression suite and independent three-of-three browser retest passed. Record the verified decision in the Switch room."
+2. **Checkpoint 2 — Worktree Patch Directive & Retest (0:50–1:05):**
+   > *"@fixer baseline failure is confirmed with a null TypeError on coupon lookup. Create isolated Git worktree BP-0007, add a null and expiry guard returning HTTP 400 Coupon expired, write a regression test, and do not touch the main branch."*
+   - `@code-fixer` creates `worktrees/BP-0007`; Groq AI Agent (`openai/gpt-oss-120b`) patches `route.ts` and adds assertions to `coupon.test.ts`; `npm test` and `tsc` pass; demo-app hot-reloads; `@bug-reproducer` reruns 3/3 browser retest; evaluator computes `VERIFIED`.
 
----
+3. **Checkpoint 3 — Human Gate Sign-Off (1:35–1:45):**
+   > *"As qa-commander, I accept verified patch BP-0007. Both the regression suite and independent three-of-three browser retest passed. Record the verified decision in the Switch room."*
+   - Enforces `qa-commander` gate; checks `VERIFIED` state; records `HUMAN_ACCEPTED` in Switch room.
 
-## 4. Quick Start & Execution
-
-### Prerequisites
-- Node.js 20+ & pnpm
-- Python 3.12+
-- Docker & Docker Compose (optional for containerized run)
-
-### Running Locally
-
-```bash
-# 1. Install dependencies
-pnpm install
-pip install -r requirements.txt
-python -m playwright install chromium
-
-# 2. Start the Demo Store (Port 3001)
-pnpm --filter demo-ecommerce dev
-
-# 3. Start the FastAPI Artifact & State Sync API (Port 8000)
-uvicorn services.api.main:app --port 8000
-
-# 4. Start the Forensic Case File Dashboard (Port 3000)
-pnpm --filter dashboard dev
-```
-
-### Running Tests
-
-```bash
-# Run unit and state-machine tests
-python -m pytest tests/api -v
-
-# Run demo-app regression test suite
-pnpm --filter demo-ecommerce test
-```
-
-### Rapid Demo Reset (Under 15 Seconds)
-
-```bash
-make demo-reset
-```
+See [`WISPR_VOICE_LOG.md`](WISPR_VOICE_LOG.md) for full verbatim prompts, and [`docs/wispr-scorecard.png`](docs/wispr-scorecard.png) for the scorecard artifact.
 
 ---
 
-## 5. Security & Isolation Matrix
+## 4. 10-Minute Clean-Room Setup & Verification Guide
 
-| Component | Capabilities & Mounts | Explicitly Forbidden |
+### Step 1: Clone & Configure Environment
+
+```bash
+git clone https://github.com/JaiswalShivang/BugFix.git
+cd BugFix
+
+# Configure credentials
+cp .env.example .env
+```
+
+Ensure `.env` contains:
+```env
+SWITCH_API_KEY=<your_switch_api_key>
+SWITCH_ROOM_NAME=bugproof
+SWITCH_ROOM_URL=https://api.switch.dev/v1
+GROQ_API_KEY=<your_groq_api_key>
+GROQ_MODEL=openai/gpt-oss-120b
+```
+
+### Step 2: Build & Start All 5 Docker Containers
+
+```bash
+docker compose up --build -d
+docker compose ps
+```
+
+All 5 services (`api`, `bug-reproducer`, `code-fixer`, `dashboard`, `demo-app`) will show `healthy`.
+
+### Step 3: Run Full Unit & Isolation Test Suite
+
+```bash
+make test
+```
+- 16/16 Python unit tests pass (command runner allowlist, SSRF allowlist, container isolation, state machine, evaluator).
+- TypeScript regression tests pass 3/3.
+- `tsc --noEmit` on demo-ecommerce and dashboard pass with 0 errors.
+
+### Step 4: Run End-to-End Pipeline Test
+
+```bash
+make e2e
+```
+- Executes full Playwright reproduction, Groq LLM patch, hot-reload, and independent browser retest.
+
+### Step 5: Run the Timed 3-Checkpoint Pipeline
+
+```bash
+python scripts/timed_3checkpoint_run.py
+```
+- Completes the entire 3-checkpoint journey in **~70 seconds** (target goal: < 110 seconds).
+
+---
+
+## 5. System Verification Matrix
+
+| Check | Target / Invariant | Result |
 |---|---|---|
-| `bug-reproducer` | Headless Chromium + Playwright; network route to `http://demo-app:3000`; writes to `/artifacts/` | NO mount to source code; cannot read or edit `.ts` files; cannot run Git |
-| `code-fixer` | Subprocess runner constrained to allowlisted commands (`npm test`, `tsc --noEmit`, `git diff`); mounted to `/worktrees/{id}` | NO Playwright or browser binary; cannot modify `main`; cannot declare `VERIFIED` |
-| `demo-app` | Serves active worktree on internal port 3000 (host port 3001) | No access to Switch credentials or unrelated host directories |
-| `dashboard` & `api` | Read-mostly telemetry mirror; SQLite append-only event log; SSE stream | Cannot execute arbitrary shell strings; cannot bypass Switch |
+| **Container Isolation** | `@bug-reproducer` has no source code; `@code-fixer` has no browser | **PASS** (automated test) |
+| **Proof Before Fix** | Baseline failure observed 3 of 3 consecutive browser attempts | **PASS** (3/3 reproduced) |
+| **Code Repair Engine** | Groq AI Agent (`openai/gpt-oss-120b`) generates guarded route + tests | **PASS** (exit code 0) |
+| **Regression Suite** | Auxiliary coupons (`SAVE20`, empty code) verified without regressions | **PASS** (3/3 pass) |
+| **Independent Retest** | Post-patch browser retest reproduces 0 errors across 3 attempts | **PASS** (3/3 pass) |
+| **Deterministic Verdict** | State evaluator strictly computes `VERIFIED` from exit codes | **PASS** (`VERIFIED`) |
+| **Human Gate** | Only `qa-commander` voice/role can record `HUMAN_ACCEPTED` | **PASS** (enforced) |
+| **A11y & Performance** | Keyboard navigation `/` + `prefers-reduced-motion` compliance | **PASS** (verified) |

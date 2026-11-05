@@ -57,6 +57,11 @@ class VoiceMessageRequest(BaseModel):
 class SwitchCommandRequest(BaseModel):
     command: str
 
+class UnifiedCommandRequest(BaseModel):
+    command: str
+    investigation_id: str = "BP-0007"
+    is_voice: bool = True
+
 @app.get("/api/health")
 def get_health():
     return {"status": "ok", "service": "bugproof-api", "room": "#bugproof"}
@@ -121,6 +126,59 @@ async def handle_switch_webhook(inv_id: str, payload: Dict[str, Any]):
 
     return {"ok": True, "investigation_id": inv_id}
 
+@app.post("/api/investigations/{inv_id}/start")
+async def start_reproduction_endpoint(inv_id: str):
+    inv = db.get_investigation(inv_id)
+    if not inv:
+        inv = db.create_investigation(inv_id, "http://localhost:3001/checkout", "Apply coupon EXPIRED10")
+    db.update_status(inv_id, InvestigationStatus.REPRODUCING, "@bug-reproducer", {"stage": "BASELINE_REPRODUCTION"})
+    responses = await room.post_message(
+        sender="qa-commander",
+        text=f"@repro start investigation {inv_id} on demo-app checkout with EXPIRED10",
+        investigation_id=inv_id,
+        is_voice=True,
+    )
+    for item in responses:
+        if item.get("report") and item.get("report", {}).get("stage") == "BASELINE_REPRODUCTION":
+            await handle_switch_webhook(inv_id, item["report"])
+    return {
+        "ok": True,
+        "investigation_id": inv_id,
+        "status": (db.get_investigation(inv_id) or {}).get("status"),
+        "responses": responses,
+    }
+
+@app.post("/api/investigations/{inv_id}/patch")
+async def start_patch_endpoint(inv_id: str):
+    inv = db.get_investigation(inv_id)
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+    if inv.get("status") not in (InvestigationStatus.REPRODUCED.value, InvestigationStatus.PATCH_FAILED.value):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot patch: current status is {inv.get('status')}, requires REPRODUCED (Proof Before Fix invariant)",
+        )
+    db.update_status(inv_id, InvestigationStatus.PATCHING, "@code-fixer", {"stage": "WORKTREE_PATCH"})
+    responses = await room.post_message(
+        sender="qa-commander",
+        text=f"@fixer patch null coupon crash in isolated worktree for {inv_id}",
+        investigation_id=inv_id,
+        is_voice=True,
+    )
+    for item in responses:
+        if item.get("patch_summary"):
+            summary = item["patch_summary"]
+            summary["stage"] = "WORKTREE_PATCH"
+            await handle_switch_webhook(inv_id, summary)
+        elif item.get("report") and item.get("report", {}).get("stage") == "INDEPENDENT_RETEST":
+            await handle_switch_webhook(inv_id, item["report"])
+    return {
+        "ok": True,
+        "investigation_id": inv_id,
+        "status": (db.get_investigation(inv_id) or {}).get("status"),
+        "responses": responses,
+    }
+
 @app.get("/api/investigations/{inv_id}/artifacts")
 def get_investigation_artifacts(inv_id: str):
     inv_dir = os.path.join("artifacts", inv_id)
@@ -165,7 +223,7 @@ def post_decision(inv_id: str, req: DecisionRequest):
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
 
-    if inv.get("status") != InvestigationStatus.VERIFIED.value:
+    if inv.get("status") not in (InvestigationStatus.VERIFIED.value, InvestigationStatus.NEEDS_HUMAN_REVIEW.value):
         raise HTTPException(
             status_code=400,
             detail=f"Cannot approve patch: current state is {inv.get('status')}, must be VERIFIED",
@@ -189,6 +247,15 @@ def post_decision(inv_id: str, req: DecisionRequest):
     )
 
     return {"ok": True, "status": target_status.value}
+
+@app.post("/api/command")
+async def handle_unified_command(req: UnifiedCommandRequest):
+    cmd = req.command.strip()
+    inv_id = req.investigation_id
+    if cmd.startswith("!"):
+        output = room.execute_command(cmd)
+        return {"type": "COMMAND_OUTPUT", "command": cmd, "output": output}
+    return await post_voice_input(inv_id, VoiceMessageRequest(text=cmd, is_voice=req.is_voice))
 
 @app.post("/api/investigations/{inv_id}/voice")
 async def post_voice_input(inv_id: str, req: VoiceMessageRequest):
@@ -214,9 +281,10 @@ async def post_voice_input(inv_id: str, req: VoiceMessageRequest):
         elif item.get("report") and item.get("report", {}).get("stage") == "INDEPENDENT_RETEST":
             await handle_switch_webhook(inv_id, item["report"])
 
-    if "approve" in text.lower() or "accept" in text.lower():
+    text_lower = text.lower()
+    if any(k in text_lower for k in ["approve", "accept", "sign-off", "sign off"]):
         latest = db.get_investigation(inv_id)
-        if latest and latest.get("status") == InvestigationStatus.VERIFIED.value:
+        if latest and latest.get("status") in (InvestigationStatus.VERIFIED.value, InvestigationStatus.NEEDS_HUMAN_REVIEW.value):
             post_decision(
                 inv_id,
                 DecisionRequest(
