@@ -29,6 +29,13 @@ class WorktreeManager:
         if os.path.exists(worktree_path):
             self.remove_worktree(inv_id)
 
+        shutil.rmtree(worktree_path, ignore_errors=True)
+        subprocess.run(
+            ["git", "worktree", "prune"],
+            cwd=self.repo_root,
+            capture_output=True,
+            shell=False,
+        )
         subprocess.run(
             ["git", "branch", "-D", branch_name],
             cwd=self.repo_root,
