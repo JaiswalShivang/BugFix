@@ -1,5 +1,6 @@
 import os
 import shutil
+import subprocess
 
 class WorktreeSwitcher:
     def __init__(self, repo_root: str = "."):
@@ -20,6 +21,16 @@ class WorktreeSwitcher:
         if not os.path.exists(self.main_backup_path) and os.path.exists(self.main_route_path):
             shutil.copyfile(self.main_route_path, self.main_backup_path)
 
+    def _sync_docker_container(self, src_file: str):
+        try:
+            subprocess.run(
+                ["docker", "cp", src_file, "bugproof-demo-app:/app/apps/demo-ecommerce/app/api/checkout/coupon/route.ts"],
+                capture_output=True,
+                check=False,
+            )
+        except Exception:
+            pass
+
     def switch_to_worktree(self, investigation_id: str) -> bool:
         worktree_route = os.path.abspath(
             os.path.join(
@@ -39,11 +50,12 @@ class WorktreeSwitcher:
             raise FileNotFoundError(f"Patched route not found in worktree: {worktree_route}")
 
         shutil.copyfile(worktree_route, self.main_route_path)
+        self._sync_docker_container(worktree_route)
         return True
 
     def switch_to_main(self) -> bool:
         if os.path.exists(self.main_backup_path):
             shutil.copyfile(self.main_backup_path, self.main_route_path)
+            self._sync_docker_container(self.main_backup_path)
             return True
         return False
-
