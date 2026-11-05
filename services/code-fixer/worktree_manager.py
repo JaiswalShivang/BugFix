@@ -53,6 +53,27 @@ class WorktreeManager:
         if res.returncode != 0:
             raise RuntimeError(f"Failed to create worktree: {res.stderr}")
 
+        root_app_modules = os.path.join(self.repo_root, "apps", "demo-ecommerce", "node_modules")
+        wt_app_modules = os.path.join(worktree_path, "apps", "demo-ecommerce", "node_modules")
+        if os.path.exists(root_app_modules) and not os.path.exists(wt_app_modules):
+            if os.name == "nt":
+                subprocess.run(["cmd", "/c", "mklink", "/J", wt_app_modules, root_app_modules], capture_output=True, shell=False)
+            else:
+                os.symlink(root_app_modules, wt_app_modules)
+
+        root_root_modules = os.path.join(self.repo_root, "node_modules")
+        wt_root_modules = os.path.join(worktree_path, "node_modules")
+        if os.path.exists(root_root_modules) and not os.path.exists(wt_root_modules):
+            if os.name == "nt":
+                subprocess.run(["cmd", "/c", "mklink", "/J", wt_root_modules, root_root_modules], capture_output=True, shell=False)
+            else:
+                os.symlink(root_root_modules, wt_root_modules)
+
+        npmrc_src = os.path.join(self.repo_root, ".npmrc")
+        npmrc_dst = os.path.join(worktree_path, ".npmrc")
+        if os.path.exists(npmrc_src) and not os.path.exists(npmrc_dst):
+            shutil.copy2(npmrc_src, npmrc_dst)
+
         return worktree_path
 
     def get_diff(self, investigation_id: str) -> str:
