@@ -24,5 +24,4 @@ reset-demo: demo-reset
 demo-reset:
 	python -c "from services.worktree_switch import WorktreeSwitcher; WorktreeSwitcher().switch_to_main()"
 	git checkout -- apps/demo-ecommerce/app/api/checkout/coupon/route.ts
-	python -c "import shutil, os; [shutil.rmtree(p, ignore_errors=True) for p in ['worktrees/BP-0007', 'artifacts/BP-0007']]"
-	git branch -D bugproof/BP-0007 || true
+	python -c "import subprocess, shutil; subprocess.run(['git', 'worktree', 'remove', '--force', 'worktrees/BP-0007'], capture_output=True); subprocess.run(['git', 'worktree', 'prune'], capture_output=True); subprocess.run(['git', 'branch', '-D', 'bugproof/BP-0007'], capture_output=True); [shutil.rmtree(p, ignore_errors=True) for p in ['worktrees/BP-0007', 'artifacts/BP-0007']]"

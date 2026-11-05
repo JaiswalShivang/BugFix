@@ -16,3 +16,4 @@ def test_parse_spoken_scenario_extraction():
     parsed_default = parse_spoken_scenario("please test expired 10 on checkout")
     assert parsed_default["coupon_code"] == "EXPIRED10"
     assert parsed_default["target_url"] == "http://localhost:3001/checkout"
+
