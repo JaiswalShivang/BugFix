@@ -8,5 +8,11 @@
   "devDependencies": {
     "tsx": "^4.23.15"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp"
+    ]
+  },
   "packageManager": "pnpm@11.25.0"
 }
