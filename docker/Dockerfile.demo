@@ -1,11 +1,12 @@
-FROM node:20-alpine
+FROM node:20-slim
 WORKDIR /app
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 RUN npm install -g pnpm
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY apps/demo-ecommerce/package.json ./apps/demo-ecommerce/
 RUN pnpm install --filter demo-ecommerce...
 COPY apps/demo-ecommerce ./apps/demo-ecommerce
 EXPOSE 3000
-HEALTHCHECK --interval=3s --timeout=3s --start-period=10s --retries=10 \
-  CMD wget --spider http://127.0.0.1:3000/checkout || exit 1
+HEALTHCHECK --interval=3s --timeout=3s --start-period=5s --retries=10 \
+  CMD curl -f http://127.0.0.1:3000/checkout || exit 1
 CMD ["pnpm", "--filter", "demo-ecommerce", "dev", "-p", "3000"]
