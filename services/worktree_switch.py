@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 import time
+import urllib.request
 
 class WorktreeSwitcher:
     def __init__(self, repo_root: str = "."):
@@ -34,7 +35,13 @@ class WorktreeSwitcher:
                 capture_output=True,
                 check=False,
             )
-            time.sleep(2)
+            for _ in range(30):
+                try:
+                    with urllib.request.urlopen("http://127.0.0.1:3001/checkout", timeout=2) as resp:
+                        if resp.status == 200:
+                            break
+                except Exception:
+                    time.sleep(0.5)
         except Exception:
             pass
 

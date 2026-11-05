@@ -59,8 +59,12 @@ async def run_single_attempt(
             await coupon_input.fill(coupon_code)
 
             apply_button = page.get_by_role("button", name="Apply coupon")
-            await apply_button.click()
-            await page.wait_for_timeout(2000)
+            try:
+                async with page.expect_response(lambda r: "coupon" in r.url, timeout=8000):
+                    await apply_button.click()
+            except Exception:
+                await apply_button.click()
+            await page.wait_for_timeout(1000)
 
             after_png = os.path.join(artifact_dir, f"attempt-{attempt}-after.png")
             await page.screenshot(path=after_png, full_page=True)
