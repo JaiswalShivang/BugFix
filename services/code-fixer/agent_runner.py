@@ -117,3 +117,11 @@ class AgentCoder:
             "output": f"Modified {route_file} and {test_file} via AST code repair engine (no OpenCode or Claude CLI binary/key found on host)",
             "exit_code": 0,
         }
+
+if __name__ == "__main__":
+    import json
+    import sys
+    worktree = sys.argv[1] if len(sys.argv) > 1 else "."
+    coder = AgentCoder(worktree)
+    res = coder.generate_patch("Fix null coupon crash on EXPIRED10", "BP-0007")
+    print(json.dumps(res, indent=2))
