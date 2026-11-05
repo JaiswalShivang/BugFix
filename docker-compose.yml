@@ -16,6 +16,8 @@ services:
       - "3001:3000"
     volumes:
       - ./apps/demo-ecommerce/app:/app/apps/demo-ecommerce/app
+    env_file:
+      - .env
     environment:
       - PORT=3000
     healthcheck:
@@ -34,6 +36,8 @@ services:
       - bugproof-net
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     environment:
       - PORT=3000
     healthcheck:
@@ -55,6 +59,8 @@ services:
     volumes:
       - ./artifacts:/app/artifacts
       - ./worktrees:/app/worktrees
+    env_file:
+      - .env
     environment:
       - PYTHONUNBUFFERED=1
     healthcheck:
@@ -73,6 +79,8 @@ services:
       - bugproof-net
     volumes:
       - ./artifacts:/app/artifacts
+    env_file:
+      - .env
     environment:
       - PYTHONUNBUFFERED=1
     healthcheck:
@@ -92,6 +100,8 @@ services:
     volumes:
       - ./worktrees:/app/worktrees
       - ./artifacts:/app/artifacts
+    env_file:
+      - .env
     environment:
       - CI=true
     healthcheck:

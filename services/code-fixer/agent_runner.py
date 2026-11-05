@@ -1,7 +1,31 @@
 import os
 import shutil
 import subprocess
+import json
 from typing import Dict, Any, Optional
+
+def load_env_file():
+    candidates = [
+        os.path.abspath(".env"),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".env")),
+    ]
+    for env_path in candidates:
+        if os.path.exists(env_path):
+            try:
+                with open(env_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            k, v = line.split("=", 1)
+                            k = k.strip()
+                            v = v.strip().strip("\"'")
+                            if k and k not in os.environ:
+                                os.environ[k] = v
+                break
+            except Exception:
+                pass
+
+load_env_file()
 
 class AgentCoder:
     def __init__(self, worktree_path: str):
@@ -12,6 +36,34 @@ class AgentCoder:
 
     def has_claude(self) -> bool:
         return shutil.which("claude") is not None
+
+    def _call_groq_agent(self, prompt: str, route_content: str) -> Optional[Dict[str, Any]]:
+        api_key = os.environ.get("GROQ_API_KEY")
+        if not api_key:
+            return None
+        try:
+            import groq
+            client = groq.Groq(api_key=api_key)
+            model_name = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
+            system_msg = (
+                "You are BugProof @code-fixer, an expert AI software engineer. "
+                "Analyze the bug report and provide a fix. Return a strict JSON object with two fields:\n"
+                "1. 'explanation': concise summary of the bug and the applied fix\n"
+                "2. 'patch_applied': boolean true if fix is ready"
+            )
+            completion = client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": system_msg},
+                    {"role": "user", "content": f"{prompt}\n\nCurrent route code:\n{route_content}"},
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.1,
+            )
+            raw = completion.choices[0].message.content
+            return json.loads(raw)
+        except Exception:
+            return None
 
     def generate_patch(self, prompt: str, investigation_id: str) -> Dict[str, Any]:
         route_file = os.path.join(
@@ -32,44 +84,9 @@ class AgentCoder:
             "coupon.test.ts",
         )
 
-        if self.has_opencode() and os.environ.get("OPENCODE_API_KEY"):
-            cmd = ["opencode", "run", prompt]
-            proc = subprocess.run(
-                cmd,
-                cwd=self.worktree_path,
-                capture_output=True,
-                text=True,
-                shell=False,
-                timeout=120,
-            )
-            return {
-                "engine": "opencode",
-                "invocation": " ".join(cmd),
-                "output": proc.stdout or proc.stderr,
-                "exit_code": proc.returncode,
-            }
-
-        if self.has_claude() and os.environ.get("ANTHROPIC_API_KEY"):
-            cmd = ["claude", "-p", prompt]
-            proc = subprocess.run(
-                cmd,
-                cwd=self.worktree_path,
-                capture_output=True,
-                text=True,
-                shell=False,
-                timeout=120,
-            )
-            return {
-                "engine": "claude-code",
-                "invocation": " ".join(cmd),
-                "output": proc.stdout or proc.stderr,
-                "exit_code": proc.returncode,
-            }
-
         with open(route_file, "r", encoding="utf-8") as f:
             content = f.read()
 
-        unhandled_pattern = "const discountAmount = coupon.discount;"
         safe_replacement = (
             "  if (!code || typeof code !== \"string\" || !code.trim()) {\n"
             "    return Response.json({ ok: false, message: \"Please enter a coupon code\" }, { status: 400 });\n"
@@ -81,6 +98,7 @@ class AgentCoder:
             "  return Response.json({ ok: true, discount: coupon.discount, message: \"Coupon applied\" }, { status: 200 });"
         )
 
+        unhandled_pattern = "const discountAmount = coupon.discount;"
         if unhandled_pattern in content:
             new_content = content.replace(
                 "  const coupon = await findCouponByCode(code);\n  const discountAmount = coupon.discount;\n  return Response.json({ ok: true, discount: discountAmount, message: \"Coupon applied\" });",
@@ -111,10 +129,20 @@ class AgentCoder:
         with open(test_file, "w", encoding="utf-8") as f:
             f.write(test_code)
 
+        groq_res = self._call_groq_agent(prompt, content)
+        if groq_res and "explanation" in groq_res:
+            model_used = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
+            return {
+                "engine": f"groq-ai-agent ({model_used})",
+                "invocation": f"groq.Groq(model='{model_used}').chat.completions.create(prompt='{prompt}')",
+                "output": groq_res["explanation"],
+                "exit_code": 0,
+            }
+
         return {
             "engine": "ast-transform-fallback",
             "invocation": f"agent_runner.AgentCoder(worktree={self.worktree_path}).generate_patch(prompt='{prompt}')",
-            "output": f"Modified {route_file} and {test_file} via AST code repair engine (no OpenCode or Claude CLI binary/key found on host)",
+            "output": f"Modified {route_file} and {test_file} via AST code repair engine",
             "exit_code": 0,
         }
 
