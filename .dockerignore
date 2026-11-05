@@ -1,7 +1,7 @@
-node_modules
-.next
-.git
+**/node_modules
+**/.next
+**/.git
 worktrees
 artifacts
 .pytest_cache
-__pycache__
+**/__pycache__
