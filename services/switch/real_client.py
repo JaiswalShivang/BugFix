@@ -4,9 +4,33 @@ import urllib.request
 import urllib.error
 from typing import Dict, Any, Optional
 
+def load_env_file():
+    candidates = [
+        os.path.abspath(".env"),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".env")),
+    ]
+    for env_path in candidates:
+        if os.path.exists(env_path):
+            try:
+                with open(env_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            k, v = line.split("=", 1)
+                            k = k.strip()
+                            v = v.strip().strip("\"'")
+                            if k and k not in os.environ:
+                                os.environ[k] = v
+                break
+            except Exception:
+                pass
+
+load_env_file()
+
 class SwitchPlatformClient:
     def __init__(self):
-        self.api_url = os.environ.get("SWITCH_API_URL", "https://api.switch.dev/v1")
+        load_env_file()
+        self.api_url = os.environ.get("SWITCH_API_URL", os.environ.get("SWITCH_ROOM_URL", "https://api.switch.dev/v1"))
         self.api_key = os.environ.get("SWITCH_API_KEY")
         self.room_id = os.environ.get("SWITCH_ROOM_ID", "bugproof")
 
