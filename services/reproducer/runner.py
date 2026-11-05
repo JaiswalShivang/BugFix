@@ -1,10 +1,10 @@
 import os
 import json
 import shutil
-import asyncio
 from typing import Dict, Any, List
 from playwright.async_api import async_playwright
 from .url_validator import is_target_url_allowed
+from .scenario_parser import normalize_coupon_code
 
 EXPECTED_FILTER_PATTERNS = [
     "status of 400",
@@ -25,6 +25,7 @@ async def run_single_attempt(
     artifact_dir: str,
     attempt: int,
 ) -> Dict[str, Any]:
+    coupon_code = normalize_coupon_code(coupon_code)
     os.makedirs(artifact_dir, exist_ok=True)
     console_errors: List[str] = []
     http_errors: List[Dict[str, Any]] = []
@@ -110,6 +111,7 @@ async def run_reproduction_scenario(
     coupon_code: str = "EXPIRED10",
     artifacts_root: str = "artifacts",
 ) -> Dict[str, Any]:
+    coupon_code = normalize_coupon_code(coupon_code)
     if not is_target_url_allowed(target_url):
         return {
             "investigation_id": investigation_id,

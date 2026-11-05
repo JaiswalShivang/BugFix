@@ -82,8 +82,9 @@ export default function CaseFilePage() {
   }, [investigationId]);
 
   async function handleSendVoice(textToSend?: string) {
-    const text = textToSend || voiceInput;
+    let text = textToSend || voiceInput;
     if (!text.trim()) return;
+    text = text.replace(/expired\s*ten/gi, "EXPIRED10").replace(/expired\s*10/gi, "EXPIRED10");
     setIsSubmittingVoice(true);
     try {
       await fetch(`${API_BASE}/api/investigations/${investigationId}/voice`, {
