@@ -1,6 +1,7 @@
 import os
 import shutil
 import subprocess
+import time
 
 class WorktreeSwitcher:
     def __init__(self, repo_root: str = "."):
@@ -28,6 +29,12 @@ class WorktreeSwitcher:
                 capture_output=True,
                 check=False,
             )
+            subprocess.run(
+                ["docker", "restart", "bugproof-demo-app"],
+                capture_output=True,
+                check=False,
+            )
+            time.sleep(2)
         except Exception:
             pass
 
