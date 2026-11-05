@@ -17,13 +17,16 @@ def apply_patch_and_verify(
     )
     agent_exec = coder.generate_patch(prompt, investigation_id)
 
+    app_dir = os.path.join(worktree_path, "apps", "demo-ecommerce")
+    target_cwd = app_dir if os.path.exists(app_dir) else worktree_path
+
     test_res = run_constrained_command(
-        ["pnpm", "--filter", "demo-ecommerce", "test"],
-        cwd=worktree_path,
+        ["npm", "test"],
+        cwd=target_cwd,
     )
     tsc_res = run_constrained_command(
-        ["pnpm", "--filter", "demo-ecommerce", "exec", "tsc", "--noEmit"],
-        cwd=worktree_path,
+        ["npx", "tsc", "--noEmit"],
+        cwd=target_cwd,
     )
 
     from .worktree_manager import WorktreeManager
