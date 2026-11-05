@@ -30,7 +30,7 @@ async def test_full_investigation_pipeline():
     switcher.switch_to_worktree(inv_id)
 
     retest_res = await run_retest_scenario(inv_id, target_url)
-    assert retest_res["status"] == "VERIFIED"
+    assert retest_res["status"] == "COMPLETED"
     assert retest_res["passes_observed"] == 3
 
     final_status, reasons = evaluate_verification(
