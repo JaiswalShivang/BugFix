@@ -21,6 +21,7 @@ async def capture_all(base_url: str = "http://localhost:3000"):
             
         diff_elem = page_light.locator("section:has-text('Exhibit D // Diff Reading Room')")
         if await diff_elem.count() > 0:
+            await diff_elem.first.screenshot(path=os.path.join(SCREENSHOT_DIR, "diff.png"))
             await diff_elem.first.screenshot(path=os.path.join(SCREENSHOT_DIR, "diff-reading-room.png"))
 
         plate_elem = page_light.locator("section:has-text('Exhibit B // Draggable Registration Plate')")
@@ -40,7 +41,13 @@ async def capture_all(base_url: str = "http://localhost:3000"):
             reduced_motion="reduce",
         )
         page_reduced = await context_reduced.new_page()
-        await page_reduced.goto(base_url, wait_until="networkidle")
+        await page_reduced.goto(f"{base_url}?investigation=BP-EMPTY", wait_until="networkidle")
+        
+        investigation_input = page_reduced.locator("input[value='BP-0007']")
+        if await investigation_input.count() > 0:
+            await investigation_input.fill("BP-EMPTY")
+            await page_reduced.wait_for_timeout(500)
+            
         await page_reduced.screenshot(path=os.path.join(SCREENSHOT_DIR, "empty-state.png"), full_page=True)
 
         await browser.close()
