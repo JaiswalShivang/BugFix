@@ -15,10 +15,6 @@ def main():
             if remote_res.get("remote_connected"):
                 print("[REMOTE SWITCH CONFIRMED]:", remote_res.get("data"))
                 return
-            else:
-                print(f"[SWITCH NOTICE - FALLBACK TO LOCAL]: Remote connection failed: {remote_res.get('reason')}")
-        else:
-            print("[SWITCH NOTICE - SIMULATED LOCAL PROTOCOL]: SWITCH_API_KEY not provided in environment. Executing via local clean-room Switch protocol.")
 
         if arg.startswith("!"):
             output = room.execute_command(arg)
